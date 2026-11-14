@@ -2,7 +2,7 @@
 const KEY = 'doodlestrike.v1';
 
 export const DEFAULT_SETTINGS = {
-  sens: 1, assist: true, sfx: true, vib: true, bots: 7, diff: 'normal',
+  sens: 1, adsMode: 'tap', assist: true, sfx: true, vib: true, bots: 7, diff: 'normal',
   quality: 'auto', full: true, fps: false,
   // HUD customisation
   hudScale: 1, hudAlpha: 1, xhStyle: 'cross', xhColor: '#1c1c26', showFeed: true, showTop3: true, showHint: true,
