@@ -33,7 +33,7 @@ Players pick 2 guns plus a lethal and a tactical in **Loadout** (main menu or pa
 Lethals: Frag (1), Sticky Doodle (4), Hot Sauce (9), Cluster Scribble (14), Paper Mine (19).
 Tacticals: Ink Bomb (1), Flash Doodle (3), Eraser Shock (7), Snack Break (11).
 
-Each gun has its own damage, range falloff, fire rate, magazine, reload, recoil, mobility and ADS speed (see `GUNS` in `data.js`). NPCs carry random guns from all four classes.
+Every gun has its own damage, range falloff, fire rate, magazine, reload, recoil, mobility and ADS speed (see `GUNS` in `data.js`). NPCs carry random guns from all four classes.
 
 ## HUD settings
 
