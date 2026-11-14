@@ -1,0 +1,64 @@
+name: Android
+
+# Builds the Android APK and publishes it as a GitHub Release, so friends can download
+# Call of Doodle from https://github.com/Devendurance/callofdoodle/releases/latest
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['README.md', 'docs/**', 'ios/**', '.github/workflows/ios.yml', 'vercel.json']
+  pull_request:
+    paths: ['android/**', 'package.json', 'package-lock.json', 'capacitor.config.json', 'scripts/**', '*.js', '*.css', 'index.html', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Bundle the web game into the Android project
+        run: |
+          npm ci
+          npm run android:sync
+
+      - name: Build signed release APK
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon assembleRelease -PversionCode=$((100 + ${{ github.run_number }}))
+          cp app/build/outputs/apk/release/app-release.apk ../CallOfDoodle.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CallOfDoodle-apk
+          path: CallOfDoodle.apk
+
+      - name: Publish GitHub Release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="android-v1.0.$((100 + ${{ github.run_number }}))"
+          gh release create "$TAG" CallOfDoodle.apk \
+            --title "Call of Doodle for Android (build $((100 + ${{ github.run_number }})))" \
+            --notes "Download **CallOfDoodle.apk** below on an Android phone, open it and allow installing from this source when asked. Built from ${GITHUB_SHA::7}." \
+            --latest

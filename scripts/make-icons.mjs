@@ -1,7 +1,7 @@
 // Renders the Call of Doodle app icon and splash screen (notebook paper + doodled crosshair)
-// into the iOS asset catalog. Run: npm run icons
+// into the iOS asset catalog and the Android res/ folders. Run: npm run icons
 import { Resvg } from '@resvg/resvg-js';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, existsSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -71,4 +71,37 @@ const splash = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${W
 const png = rgbPng(new Resvg(splash, { background: paper, font: { loadSystemFonts: true } }).render());
 for (const n of ['splash-2732x2732.png', 'splash-2732x2732-1.png', 'splash-2732x2732-2.png'])
   writeFileSync(join(assets, 'Splash.imageset', n), png);
-console.log('icon + splash written');
+console.log('iOS icon + splash written');
+
+// Android: legacy square + round launcher icons, adaptive-icon foreground (crosshair on transparent,
+// background colour in values/ic_launcher_background.xml), and landscape/portrait splash screens.
+const res = join(root, 'android/app/src/main/res');
+if (existsSync(res)) {
+  const dens = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
+  const iconSvg = (n, round) => `<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${n}" viewBox="0 0 ${S} ${S}">
+    ${round ? `<clipPath id="c"><circle cx="${S / 2}" cy="${S / 2}" r="${S / 2}"/></clipPath><g clip-path="url(#c)">` : '<g>'}
+    <rect width="${S}" height="${S}" fill="${paper}"/>${lines(S, S, 92)}
+    <path d="M150 0V${S}" stroke="${margin}" stroke-width="7"/>${crosshair(S / 2 + 30, S / 2, 300)}</g></svg>`;
+  // adaptive foreground: 108dp canvas, keep the crosshair inside the 66dp safe zone
+  const fgSvg = (n) => `<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${n}" viewBox="0 0 108 108">
+    ${crosshair(54, 54, 20)}</svg>`;
+  const splashSvg = (w, h) => {
+    const u = Math.min(w, h);
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <rect width="${w}" height="${h}" fill="${paper}"/>${lines(w, h, u / 12)}
+      ${crosshair(w / 2, h / 2 - u * 0.08, u * 0.13)}
+      <text x="${w / 2}" y="${h / 2 + u * 0.2}" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="${u * 0.09}" fill="${ink}" letter-spacing="${u * 0.004}">CALL OF DOODLE</text></svg>`;
+  };
+  const render = (svg) => new Resvg(svg, { font: { loadSystemFonts: true } }).render().asPng();
+  for (const [d, k] of Object.entries(dens)) {
+    const n = Math.round(48 * k);
+    writeFileSync(join(res, `mipmap-${d}/ic_launcher.png`), render(iconSvg(n, false)));
+    writeFileSync(join(res, `mipmap-${d}/ic_launcher_round.png`), render(iconSvg(n, true)));
+    writeFileSync(join(res, `mipmap-${d}/ic_launcher_foreground.png`), render(fgSvg(Math.round(108 * k))));
+    const lw = Math.round(480 * k), lh = Math.round(320 * k);
+    writeFileSync(join(res, `drawable-land-${d}/splash.png`), render(splashSvg(lw, lh)));
+    writeFileSync(join(res, `drawable-port-${d}/splash.png`), render(splashSvg(lh, lw)));
+  }
+  writeFileSync(join(res, 'drawable/splash.png'), render(splashSvg(480, 320)));
+  console.log('Android icons + splash written');
+}

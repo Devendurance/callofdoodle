@@ -522,7 +522,7 @@ function floater(text) {
 }
 let pmT = 0;
 function pickupMsg(t) { const el = $('#pickupMsg'); el.textContent = t; el.classList.add('on'); clearTimeout(pmT); pmT = setTimeout(() => el.classList.remove('on'), 1200); }
-// iOS app (Capacitor): WKWebView has no navigator.vibrate, so use the native Haptics plugin.
+// iOS/Android apps (Capacitor): use the native Haptics plugin (iOS WKWebView has no navigator.vibrate).
 const nativeCap = window.Capacitor?.isNativePlatform?.() ? window.Capacitor : null;
 if (nativeCap) document.body.classList.add('native');
 function vibrate(p) {
@@ -835,7 +835,7 @@ function resumeGame() {
   S.paused = false; showScreen(null); lockPointer();
 }
 function goFullscreen() {
-  if (nativeCap) return; // the iOS app is already full screen and landscape-locked
+  if (nativeCap) return; // the iOS/Android apps are already full screen and landscape-locked
   const d = document.documentElement;
   try {
     const r = (d.requestFullscreen || d.webkitRequestFullscreen)?.call(d, { navigationUI: 'hide' });
