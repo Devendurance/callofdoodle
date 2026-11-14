@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f6f1e3">
+<title>Doodle Strike</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2213%22 fill=%22%23f7f2e4%22 stroke=%22%231c1c26%22 stroke-width=%223%22/%3E%3Cpath d=%22M16 4v8M16 20v8M4 16h8M20 16h8%22 stroke=%22%23e0473f%22 stroke-width=%223%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="vignette"></div>
+<div id="scopeOverlay"><div class="ring"></div></div>
+
+<!-- ================= HUD (laid out like the sketch) ================= -->
+<div id="hud" class="hidden">
+  <div id="tl">
+    <button class="ic small doodle-circle" data-btn="sound" id="bSound" aria-label="Sound">
+      <svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 9c1.5 1.5 1.5 4.5 0 6M18.5 6.5c3 3 3 8 0 11"/></svg>
+    </button>
+    <div id="scorebox">
+      <div class="srow"><span class="slabel">YOU</span><div class="sbar"><i id="sbYou"></i></div><b id="sYou">0</b></div>
+      <div class="srow"><span class="slabel" id="sLeadName">BEST</span><div class="sbar"><i id="sbLead"></i></div><b id="sLead">0</b></div>
+      <div class="stag">20 points to win</div>
+    </div>
+  </div>
+  <div id="top3" data-btn="board"></div>
+
+  <button class="ic doodle-circle" data-btn="pause" id="bPause" aria-label="Pause">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.4v2.8M12 18.8v2.8M2.4 12h2.8M18.8 12h2.8M5.2 5.2l2 2M16.8 16.8l2 2M5.2 18.8l2-2M16.8 7.2l2-2"/></svg>
+  </button>
+  <div id="feed"></div>
+
+  <div id="xhair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="d"></i></div>
+  <div id="hitmark"><i></i><i></i><i></i><i></i></div>
+  <div id="dmgdir"></div>
+  <div id="centerMsg"></div>
+  <div id="floaters"></div>
+  <div id="pickupMsg"></div>
+
+  <!-- bottom bars -->
+  <div id="armorWrap" class="barwrap"><span id="armorNum">50</span><div class="bar armor"><i id="armorFill"></i></div></div>
+  <div id="hpWrap" class="barwrap"><span class="hplabel">HP</span><div class="bar hp"><i id="hpFill"></i></div><span id="hpNum">100</span></div>
+
+  <!-- left controls -->
+  <div id="joyZone" class="touchonly"></div>
+  <div id="joy" class="touchonly doodle-circle"><div id="knob" class="doodle-circle"></div>
+    <i class="ar up"></i><i class="ar dn"></i><i class="ar lf"></i><i class="ar rt"></i></div>
+  <button class="ic touchonly doodle-circle" data-btn="jump" id="bJump" aria-label="Jump">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.2"/><path d="M12 7.5v6M12 9.5l-4.5-3M12 9.5l4.5-3M12 13.5l-3.5 4M12 13.5l3.5 4M6 21.5h12"/></svg>
+  </button>
+  <button class="ic touchonly doodle-circle" data-btn="crouch" id="bCrouch" aria-label="Crouch">
+    <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="2.2"/><path d="M9 10.5l2.5 4h5M11.5 14.5l-1.5 5M9.5 11l4 1M6 21h12"/></svg>
+  </button>
+
+  <!-- right controls -->
+  <div id="weapons">
+    <button class="wcard" data-btn="w1" id="w1">
+      <svg viewBox="0 0 64 24"><path d="M2 12h40h18M4 12v3h12l-2 5h6l2-5h10M14 8h16v-3h-16z M30 12v3"/></svg>
+      <b id="w1ammo">10/80</b>
+    </button>
+    <button class="wcard active" data-btn="w0" id="w0">
+      <svg viewBox="0 0 64 24"><path d="M2 11h34l3-3h10v4h12M49 12v3h-10l-2 1H22l-2 6h-6l2-6H4v-5M24 16v4h4M8 8h12"/></svg>
+      <b id="w0ammo">60/240</b>
+    </button>
+  </div>
+  <button class="ic touchonly doodle-circle" data-btn="reload" id="bReload" aria-label="Reload">
+    <svg viewBox="0 0 24 24"><path d="M5 6v12M8.5 6v12M12 6v12M15.5 6v12M19 6v12M3 18h18"/></svg>
+  </button>
+  <button class="ic touchonly doodle-circle nade" data-btn="frag" id="bFrag" aria-label="Frag grenade">
+    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="14.5" rx="6" ry="6.8"/><path d="M10 7.8V5.5h4v2.3M14 5.5c2-2 4.5-1.2 5 1M8.5 12.5h7M8.5 16.5h7"/></svg><b id="fragN">2</b>
+  </button>
+  <button class="ic touchonly doodle-circle nade" data-btn="ink" id="bInk" aria-label="Ink bomb">
+    <svg viewBox="0 0 24 24"><path d="M12 3c3 5 6.5 8 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 11 9 8 12 3z"/><path d="M9 15a3 3 0 0 0 3 3"/></svg><b id="inkN">2</b>
+  </button>
+  <button class="ic touchonly doodle-circle" data-btn="fire" id="bFire" aria-label="Fire">
+    <svg viewBox="0 0 24 24"><g transform="rotate(40 12 12)"><path d="M9 21V10.5C9 6.5 12 3 12 3s3 3.5 3 7.5V21z"/><path d="M8 21h8M9 12.5h6M10 17h4"/></g></svg>
+  </button>
+  <button class="ic touchonly doodle-circle" data-btn="scope" id="bScope" aria-label="Aim">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><path d="M12 2v6.5M12 15.5V22M2 12h6.5M15.5 12H22"/><circle cx="12" cy="12" r="1"/></svg>
+  </button>
+
+  <div id="board" class="hidden"></div>
+  <div id="deathScreen" class="hidden"><div class="erased">ERASED!</div><div id="killedBy"></div><div id="respawnIn"></div></div>
+  <div id="fps" class="hidden"></div>
+  <div id="desktopHint" class="desktoponly">Click to aim · WASD move · Space jump · C crouch · R reload · Q/1/2 swap · G frag · F ink · Right-click scope · Esc pause</div>
+</div>
+
+<!-- ================= SCREENS ================= -->
+<div id="screens">
+
+  <section class="screen" id="sMenu">
+    <div class="menuGrid">
+      <div class="menuLeft">
+        <h1 class="logo">DOODLE<br><span>STRIKE</span></h1>
+        <p class="sub">a notebook-margin shooter</p>
+        <button class="big doodle-box" id="btnPlay">START GAME</button>
+        <p class="mode">Free-for-all &middot; <b>first to 20</b> &middot; <span id="menuBots">7</span> NPC rivals</p>
+        <div class="row">
+          <button class="doodle-box" id="btnProfiles">Profiles</button>
+          <button class="doodle-box" id="btnSettings">Settings</button>
+          <button class="doodle-box" id="btnHow">How to play</button>
+        </div>
+        <button class="doodle-box ghost" disabled>Online multiplayer &mdash; coming soon</button>
+      </div>
+      <div class="menuRight">
+        <div class="pcard doodle-box" id="menuProfile"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="sProfiles">
+    <div class="panel doodle-box">
+      <h2>Profiles</h2>
+      <div class="profGrid">
+        <div id="profList"></div>
+        <div id="profDetail"></div>
+      </div>
+      <div class="row foot">
+        <button class="doodle-box" data-back>Back</button>
+        <button class="doodle-box" id="btnNewProfile">+ New profile</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="sEdit">
+    <div class="panel doodle-box">
+      <h2 id="editTitle">Create your profile</h2>
+      <label class="field">Name <input id="editName" maxlength="14" autocomplete="off" placeholder="Your doodle name"></label>
+      <div class="lbl">Face</div>
+      <div id="avatarPick" class="pickRow"></div>
+      <div class="lbl">Ink colour</div>
+      <div id="inkPick" class="pickRow"></div>
+      <div class="row foot">
+        <button class="doodle-box" id="btnEditCancel">Cancel</button>
+        <button class="doodle-box danger" id="btnEditDelete">Delete</button>
+        <button class="doodle-box primary" id="btnEditSave">Save</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="sSettings">
+    <div class="panel doodle-box">
+      <h2>Settings</h2>
+      <div class="settings">
+        <label>Look sensitivity <input type="range" id="setSens" min="0.3" max="2.5" step="0.05"><output id="setSensV"></output></label>
+        <label>Aim assist <input type="checkbox" id="setAssist"></label>
+        <label>Sound <input type="checkbox" id="setSfx"></label>
+        <label>Vibration <input type="checkbox" id="setVib"></label>
+        <label>NPC rivals <input type="range" id="setBots" min="3" max="11" step="1"><output id="setBotsV"></output></label>
+        <label>NPC difficulty
+          <select id="setDiff"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
+        <label>Graphics
+          <select id="setQuality"><option value="auto">Auto</option><option value="low">Fast</option><option value="high">Sharp</option></select></label>
+        <label>Go fullscreen on start <input type="checkbox" id="setFull"></label>
+        <label>Show FPS <input type="checkbox" id="setFps"></label>
+      </div>
+      <div class="row foot">
+        <button class="doodle-box danger" id="btnReset">Reset all data</button>
+        <button class="doodle-box primary" data-back>Done</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="sHow">
+    <div class="panel doodle-box">
+      <h2>How to play</h2>
+      <ul class="how">
+        <li><b>Left thumb:</b> drag anywhere on the left side to move. Push all the way forward to sprint.</li>
+        <li><b>Right thumb:</b> drag on the right side to look. Hold the <b>bullet</b> button to fire &mdash; you can keep dragging it to aim while shooting.</li>
+        <li><b>Crosshair-circle</b> = aim down sights / sniper scope. <b>Tap a weapon card</b> to swap guns. Stripes button reloads.</li>
+        <li><b>Grenade</b> explodes; <b>ink drop</b> makes a cloud that blocks NPC vision.</li>
+        <li>Grab <b>+ health</b>, <b>shield</b> and <b>ammo</b> doodles on the map.</li>
+        <li>Every kill = 1 point. First to <b>20</b> wins. Earn XP for kills, headshots, streaks and placing &mdash; level up to unlock faces, ink colours and titles.</li>
+        <li>Desktop: WASD, mouse, Space, C, R, Q, G, F, right-click.</li>
+      </ul>
+      <div class="row foot"><button class="doodle-box primary" data-back>Got it</button></div>
+    </div>
+  </section>
+
+  <section class="screen" id="sPause">
+    <div class="panel doodle-box narrow">
+      <h2>Paused</h2>
+      <div class="col">
+        <button class="doodle-box primary big" id="btnResume">Resume</button>
+        <button class="doodle-box" id="btnPauseSettings">Settings</button>
+        <button class="doodle-box danger" id="btnQuit">Quit match</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="sEnd">
+    <div class="panel doodle-box wide">
+      <h2 id="endTitle">VICTORY!</h2>
+      <p id="endSub"></p>
+      <div class="endGrid">
+        <div id="endTable"></div>
+        <div>
+          <div id="endXp"></div>
+          <div id="endLevel"></div>
+        </div>
+      </div>
+      <div class="row foot">
+        <button class="doodle-box" id="btnEndMenu">Main menu</button>
+        <button class="doodle-box primary" id="btnAgain">Play again</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="rotate"><div class="phone"></div><p>Turn your phone sideways to play</p></div>
+<div id="loading">Sharpening pencils&hellip;</div>
+<div id="toast"></div>
+
+<script type="importmap">{"imports":{"three":"./three.module.min.js"}}</script>
+<script type="module" src="game.js"></script>
+</body>
+</html>
