@@ -1,0 +1,9 @@
+# Vercel serves the static game from the repo root as-is (no build step).
+# Keep the iOS project and tooling out of the web deployment.
+ios/
+www/
+scripts/
+node_modules/
+package.json
+package-lock.json
+capacitor.config.json

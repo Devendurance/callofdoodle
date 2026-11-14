@@ -1,0 +1,12 @@
+{
+  "appId": "com.devendurance.callofdoodle",
+  "appName": "Call of Doodle",
+  "webDir": "www",
+  "backgroundColor": "#f7f2e4",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#f7f2e4",
+    "allowsLinkPreview": false
+  }
+}
