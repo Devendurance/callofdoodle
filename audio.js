@@ -36,6 +36,13 @@ function tone(t, dur, f0, f1, vol, type = 'square') {
 const SFX = {
   rifle: (t, v) => { noise(t, 0.12, 2400, 0.8, 0.55 * v, 'lowpass', 300); tone(t, 0.06, 180, 60, 0.25 * v); },
   sniper: (t, v) => { noise(t, 0.45, 3000, 0.7, 0.8 * v, 'lowpass', 120); tone(t, 0.25, 120, 40, 0.45 * v, 'sawtooth'); },
+  smg: (t, v) => { noise(t, 0.08, 3200, 0.9, 0.42 * v, 'lowpass', 500); tone(t, 0.04, 240, 90, 0.18 * v); },
+  shotgun: (t, v) => { noise(t, 0.35, 1800, 0.6, 0.9 * v, 'lowpass', 90); tone(t, 0.18, 110, 40, 0.5 * v, 'sawtooth'); },
+  flashbang: (t, v) => { noise(t, 0.5, 6000, 0.5, 0.9 * v, 'highpass', 2000); tone(t, 1.4, 3800, 3600, 0.08 * v, 'sine'); },
+  shock: (t, v) => { tone(t, 0.5, 160, 50, 0.5 * v, 'sine'); noise(t, 0.4, 500, 2, 0.4 * v, 'bandpass', 120); },
+  stim: (t, v) => { [440, 660, 880].forEach((f, i) => tone(t + i * 0.07, 0.12, f, 0, 0.16 * v, 'triangle')); },
+  fire: (t, v) => { noise(t, 0.7, 900, 1.5, 0.5 * v, 'bandpass', 300); },
+  beep: (t, v) => { tone(t, 0.06, 1500, 0, 0.12 * v, 'square'); },
   enemyShot: (t, v) => { noise(t, 0.09, 1800, 0.8, 0.35 * v, 'lowpass', 400); },
   hit: (t, v) => { tone(t, 0.05, 1400, 900, 0.18 * v, 'triangle'); },
   head: (t, v) => { tone(t, 0.07, 2000, 2600, 0.22 * v, 'triangle'); tone(t + 0.05, 0.08, 2600, 3000, 0.15 * v, 'triangle'); },
