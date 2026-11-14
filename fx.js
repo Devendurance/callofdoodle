@@ -55,6 +55,22 @@ export function makeTextures() {
     for (let i = 0; i < 90; i++) { const a = r() * 7, d = r() * s * 0.42; const x = s / 2 + Math.cos(a) * d, y = s / 2 + Math.sin(a) * d;
       ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + (r() - 0.5) * 40, y + (r() - 0.5) * 40, x + (r() - 0.5) * 30, y + (r() - 0.5) * 30); ctx.stroke(); }
   }, 128);
+  T.fire = canvasTex((ctx, s) => {
+    const r = makeRnd(23); ctx.lineWidth = 5; ctx.strokeStyle = INKC; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(s * 0.18, s * 0.9);
+    for (let i = 0; i <= 6; i++) { const x = s * (0.18 + i * 0.107); ctx.quadraticCurveTo(x - s * 0.06, s * (0.35 - r() * 0.25), x + s * 0.05, i % 2 ? s * 0.5 : s * 0.2); }
+    ctx.lineTo(s * 0.86, s * 0.9); ctx.closePath(); ctx.fillStyle = '#ff7a2a'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.ellipse(s / 2, s * 0.72, s * 0.2, s * 0.16, 0, 0, 7); ctx.fill();
+  }, 128);
+  T.flashb = canvasTex((ctx, s) => {
+    const r = makeRnd(29); ctx.lineWidth = 6; ctx.strokeStyle = INKC; ctx.lineJoin = 'round';
+    scribbleBlob(ctx, s / 2, s / 2, s * 0.46, 22, r, '#ffffff');
+    ctx.font = `${s * 0.2}px Marker, Impact, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = INKC; ctx.fillText('FLASH!', s / 2, s / 2);
+  }, 256);
+  T.shock = canvasTex((ctx, s) => {
+    ctx.lineWidth = 6; ctx.strokeStyle = '#3d7fe0'; ctx.setLineDash([16, 10]);
+    for (const k of [0.44, 0.32, 0.2]) { ctx.beginPath(); ctx.arc(s / 2, s / 2, s * k, 0, 7); ctx.stroke(); }
+  }, 256);
   T.ring = canvasTex((ctx, s) => {
     ctx.strokeStyle = INKC; ctx.lineWidth = 5; ctx.setLineDash([14, 10]);
     ctx.beginPath(); ctx.arc(s / 2, s / 2, s * 0.42, 0, 7); ctx.stroke();
@@ -159,13 +175,19 @@ export class FX {
 
 // -------------------------------------------------------------- grenades
 const nadeGeo = new THREE.SphereGeometry(0.13, 10, 8);
+const mineGeo = new THREE.CylinderGeometry(0.22, 0.25, 0.08, 14);
+const NADE_COL = { frag: 0x6fa04a, sticky: 0xc6e04a, fire: 0xe0473f, cluster: 0xf07a1a, bomblet: 0xf07a1a, mine: 0x55555f, ink: 0x2a2a40, flash: 0xfffdf6, concussion: 0x3d7fe0 };
 export function makeGrenadeMesh(type) {
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(nadeGeo, new THREE.MeshBasicMaterial({ color: type === 'ink' ? 0x2a2a40 : 0x6fa04a })));
-  const o = new THREE.Mesh(nadeGeo, new THREE.MeshBasicMaterial({ color: 0x1c1c26, side: THREE.BackSide })); o.scale.setScalar(1.3); g.add(o);
+  const geo = type === 'mine' ? mineGeo : nadeGeo;
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: NADE_COL[type] ?? 0x6fa04a })); g.add(m);
+  const o = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x1c1c26, side: THREE.BackSide })); o.scale.setScalar(type === 'mine' ? 1.15 : 1.3); g.add(o);
+  if (type === 'mine') { const led = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff2a2a })); led.position.y = 0.06; g.add(led); g.userData.led = led; }
+  if (type === 'bomblet') g.scale.setScalar(0.6);
   return g;
 }
 const hitN = { nx: 0, ny: 0, nz: 0 };
+const FLOOR_N = { nx: 0, ny: 1, nz: 0 };
 export function stepGrenade(n, dt) {
   n.vy -= 20 * dt;
   const sp = Math.hypot(n.vx, n.vy, n.vz);
@@ -179,9 +201,9 @@ export function stepGrenade(n, dt) {
     n.vx -= 1.5 * vn * hitN.nx; n.vy -= 1.5 * vn * hitN.ny; n.vz -= 1.5 * vn * hitN.nz;
     n.vx *= 0.6; n.vz *= 0.6; n.vy *= 0.6;
     if (hitN.ny > 0.5 && Math.abs(n.vy) < 1.2) { n.vy = 0; n.y = Math.max(n.y, 0.13); n.vx *= 0.8; n.vz *= 0.8; }
-    if (n.onBounce) n.onBounce(Math.abs(vn));
+    if (n.onBounce) n.onBounce(Math.abs(vn), hitN);
   } else { n.x += n.vx * dt; n.y += n.vy * dt; n.z += n.vz * dt; }
-  if (n.y < 0.13) { n.y = 0.13; n.vy = Math.abs(n.vy) * 0.4; n.vx *= 0.8; n.vz *= 0.8; }
+  if (n.y < 0.13) { const v = Math.abs(n.vy); n.y = 0.13; n.vy = v * 0.4; n.vx *= 0.8; n.vz *= 0.8; if (n.onBounce && v > 0.5) n.onBounce(v, FLOOR_N); }
 }
 
 // -------------------------------------------------------------- pickups
