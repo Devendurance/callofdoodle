@@ -522,7 +522,19 @@ function floater(text) {
 }
 let pmT = 0;
 function pickupMsg(t) { const el = $('#pickupMsg'); el.textContent = t; el.classList.add('on'); clearTimeout(pmT); pmT = setTimeout(() => el.classList.remove('on'), 1200); }
-function vibrate(p) { if (store.settings.vib && navigator.vibrate) try { navigator.vibrate(p); } catch {} }
+// iOS app (Capacitor): WKWebView has no navigator.vibrate, so use the native Haptics plugin.
+const nativeCap = window.Capacitor?.isNativePlatform?.() ? window.Capacitor : null;
+if (nativeCap) document.body.classList.add('native');
+function vibrate(p) {
+  if (!store.settings.vib) return;
+  if (nativeCap) {
+    const ms = Array.isArray(p) ? p.reduce((a, b) => a + b, 0) : p;
+    const style = ms >= 60 ? 'HEAVY' : ms >= 25 ? 'MEDIUM' : 'LIGHT';
+    nativeCap.nativePromise?.('Haptics', 'impact', { style }).catch(() => {});
+    return;
+  }
+  if (navigator.vibrate) try { navigator.vibrate(p); } catch {}
+}
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // HUD
@@ -823,6 +835,7 @@ function resumeGame() {
   S.paused = false; showScreen(null); lockPointer();
 }
 function goFullscreen() {
+  if (nativeCap) return; // the iOS app is already full screen and landscape-locked
   const d = document.documentElement;
   try {
     const r = (d.requestFullscreen || d.webkitRequestFullscreen)?.call(d, { navigationUI: 'hide' });

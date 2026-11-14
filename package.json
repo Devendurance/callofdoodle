@@ -1,0 +1,21 @@
+{
+  "name": "callofdoodle",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Call of Doodle: a doodle FPS for mobile. Web build (Vercel) plus a Capacitor iOS app.",
+  "scripts": {
+    "web:copy": "node scripts/copy-web.mjs",
+    "ios:sync": "npm run web:copy && cap sync ios",
+    "ios:open": "cap open ios",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.6.2",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2",
+    "@resvg/resvg-js": "2.6.2"
+  }
+}
