@@ -1,5 +1,6 @@
 // NPC opponents: doodle visuals + free-for-all AI.
 import * as THREE from 'three';
+import { GUNS } from './data.js';
 import { shared, moveBody, lineClear, findPath, randomWalkable, walkable, canvasTex } from './world.js';
 import { avatarCanvas } from './data.js';
 
@@ -110,14 +111,16 @@ export function makeFighter(o) {
 
 let nextId = 1;
 export class Bot {
-  constructor(G, { name, avatar, ink }, diffName) {
+  constructor(G, { name, avatar, ink, gun }, diffName) {
     this.G = G;
     Object.assign(this, makeFighter({ id: nextId++, name, avatar, ink }));
     const d = DIFF[diffName] || DIFF.normal;
     const m = 0.8 + Math.random() * 0.4;
     this.skill = { acc: d.acc * m, react: d.react / m, turn: d.turn * (0.85 + Math.random() * 0.3), speed: d.speed * (0.92 + Math.random() * 0.16) };
-    this.weapon = Math.random() < 0.25 ? 'sniper' : 'rifle';
-    this.prefDist = this.weapon === 'sniper' ? 22 : 10 + Math.random() * 6;
+    this.gunDef = gun || GUNS[(Math.random() * GUNS.length) | 0];
+    this.weapon = this.gunDef.cls === 'sniper' ? 'sniper' : 'rifle';
+    this.prefDist = { sniper: 22, ar: 10 + Math.random() * 6, smg: 6 + Math.random() * 4, shotgun: 3 + Math.random() * 3 }[this.gunDef.cls];
+    this.blindT = 0; this.slowT = 0;
     this.target = null; this.visible = false; this.lastSeen = null; this.lastSeenAt = -9;
     this.reaction = 0; this.track = 0; this.cool = 0; this.burst = 0;
     this.scanT = Math.random() * 0.2; this.path = null; this.goalT = 0; this.strafeT = 0; this.strafeDir = 1;
@@ -141,6 +144,8 @@ export class Bot {
     const gun = new THREE.Group();
     const gm = new THREE.Mesh(GEO.gun, gunMat); gun.add(gm);
     const go = new THREE.Mesh(GEO.gun, outlineMaterial(0.02)); go.scale.set(1.25, 1.2, 1.06); gun.add(go);
+    if (this.gunDef.cls === 'smg') { gm.scale.z = 0.72; go.scale.z = 0.78; }
+    if (this.gunDef.cls === 'shotgun') { gm.scale.set(1.15, 1.1, 1.2); go.scale.set(1.4, 1.3, 1.26); }
     if (this.weapon === 'sniper') { const sc = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.25), gunMat); sc.position.set(0, 0.09, -0.02); gun.add(sc); gm.scale.z = 1.35; go.scale.z = 1.4; }
     gun.position.set(0.16, 1.08, -0.38); g.add(gun); this.gun = gun;
     for (const [x, z, rx] of [[0.25, -0.12, -1.25], [-0.12, -0.25, -1.35]]) {
@@ -176,6 +181,7 @@ export class Bot {
   // ------------------------------------------------ AI
   perceive() {
     const G = this.G, b = this.body, ey = this.eye();
+    if (this.blindT > 0) { this.visible = false; return; } // flashed: can't see anyone
     let best = null, bestScore = 1e9;
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     for (const o of G.fighters) {
@@ -237,6 +243,9 @@ export class Bot {
     if (this.scanT <= 0) { this.scanT = 0.12 + Math.random() * 0.1; this.perceive(); }
 
     let mx = 0, mz = 0, faceYaw = null, speed = 4.4 * this.skill.speed;
+    this.blindT -= dt; this.slowT -= dt;
+    if (this.slowT > 0) speed *= 0.45;
+    const turn = this.skill.turn * (this.slowT > 0 ? 0.35 : 1);
     const tgt = this.target;
     if (tgt && tgt.alive && this.visible) {
       const dx = tgt.body.x - b.x, dz = tgt.body.z - b.z, dist = Math.hypot(dx, dz);
@@ -266,7 +275,7 @@ export class Bot {
       if (tgt && !this.visible && this.lastSeen) faceYaw = Math.atan2(-(this.lastSeen.x - b.x), -(this.lastSeen.z - b.z));
     }
     if (this.crouchT > 0) { this.crouchT -= dt; this.crouch = true; speed *= 0.5; } else this.crouch = false;
-    if (faceYaw !== null) this.yaw += clamp(angDiff(this.yaw, faceYaw), -this.skill.turn * dt, this.skill.turn * dt);
+    if (faceYaw !== null) this.yaw += clamp(angDiff(this.yaw, faceYaw), -turn * dt, turn * dt);
 
     // move
     const ml = Math.hypot(mx, mz);
@@ -313,31 +322,40 @@ export class Bot {
   }
 
   shoot(tgt, dist) {
-    const G = this.G, b = this.body;
-    const sniper = this.weapon === 'sniper';
-    if (sniper) this.cool = 1.5 + Math.random() * 0.8;
+    const G = this.G, b = this.body, g = this.gunDef, cls = g.cls;
+    if (cls === 'sniper') this.cool = g.rate * 1.4 + 0.3 + Math.random() * 0.8;
+    else if (cls === 'shotgun') this.cool = g.rate * 1.5 + 0.2 + Math.random() * 0.4;
     else {
       if (this.burst <= 0) this.burst = 3 + ((Math.random() * 4) | 0);
       this.burst--;
-      this.cool = this.burst <= 0 ? 0.35 + Math.random() * 0.5 : 0.11 + Math.random() * 0.03;
+      this.cool = this.burst <= 0 ? 0.35 + Math.random() * 0.5 : g.rate * 1.4 + Math.random() * 0.03;
     }
     this.mflashT = 0.05;
     // hit chance
-    let p = this.skill.acc * (sniper ? 1.6 : 1);
-    p *= sniper ? clamp(1.15 - dist / 90, 0.3, 1) : clamp(1.2 - dist / 38, 0.15, 1.1);
+    let p = this.skill.acc * (cls === 'sniper' ? 1.6 : cls === 'shotgun' ? 1.5 : 1);
+    p *= cls === 'sniper' ? clamp(1.15 - dist / 90, 0.3, 1)
+      : cls === 'shotgun' ? clamp(1.3 - dist / 12, 0.05, 1.2)
+      : cls === 'smg' ? clamp(1.25 - dist / 30, 0.12, 1.15)
+      : clamp(1.2 - dist / 38, 0.15, 1.1);
     const tv = Math.hypot(tgt.vel.x, tgt.vel.z);
     if (tv > 1) p *= 0.78;
     if (!tgt.body.onGround) p *= 0.75;
     if (tgt.crouch) p *= 0.85;
     p *= 0.45 + 0.55 * this.track;
+    if (this.slowT > 0) p *= 0.6;
     if (tgt.isPlayer) p *= G.playerHitMul;
     const hit = Math.random() < p;
-    const head = hit && Math.random() < (sniper ? 0.3 : 0.12);
-    const from = new THREE.Vector3(b.x, this.eye() - 0.4, b.z).addScaledVector(new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)), sniper ? 1.1 : 0.8);
+    const head = hit && Math.random() < (cls === 'sniper' ? 0.3 : cls === 'shotgun' ? 0.1 : 0.12);
+    let dmg;
+    if (cls === 'sniper') dmg = g.dmg * (head ? 1.15 : 0.67);
+    else if (cls === 'shotgun') dmg = g.dmg * g.pellets * 0.45 * clamp(1.15 - dist / g.fall[1], 0.15, 1) * (head ? 1.3 : 1);
+    else dmg = g.dmg * 0.52 * (head ? 2 : 1);
+    const muzz = cls === 'sniper' ? 1.1 : cls === 'smg' ? 0.65 : 0.85;
+    const from = new THREE.Vector3(b.x, this.eye() - 0.4, b.z).addScaledVector(new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)), muzz);
     from.x += Math.cos(this.yaw) * 0.16; from.z -= Math.sin(this.yaw) * 0.16;
     const to = new THREE.Vector3(tgt.body.x, tgt.body.y + (head ? 1.55 : 1.0), tgt.body.z);
     if (!hit) { to.x += (Math.random() - 0.5) * 2.2; to.y += (Math.random() - 0.3) * 1.4; to.z += (Math.random() - 0.5) * 2.2; }
-    G.botShot(this, from, to, hit ? tgt : null, sniper ? (head ? 120 : 70) : (head ? 22 : 11), head, sniper);
+    G.botShot(this, from, to, hit ? tgt : null, Math.round(dmg), head, g);
   }
 
   // hitscan test vs this bot's body (cylinder) and head (sphere)
