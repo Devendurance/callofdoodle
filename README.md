@@ -63,6 +63,31 @@ npm run ios:sync
 npm run ios:open      # opens Xcode: pick your team under Signing & Capabilities, then Product > Archive
 ```
 
+## Android app (APK, free to share)
+
+The same Capacitor project also builds an Android app, **Call of Doodle** (`com.devendurance.callofdoodle`,
+Android 7+), locked to landscape, full screen, with native haptics. No Play Store account is needed to share it.
+
+**Download:** every push to `main` builds a signed APK and publishes it at
+[Releases > latest](https://github.com/Devendurance/callofdoodle/releases/latest) (asset `CallOfDoodle.apk`),
+via `.github/workflows/android.yml`. Share that link with friends.
+
+**Installing on a phone:** open the link on the Android phone, download `CallOfDoodle.apk`, open it and allow
+"Install unknown apps" for the browser (or Slack/Drive) when Android asks. Play Protect may warn that the app is
+from an unknown developer; tap **Install anyway**. New builds install as updates over the old one, keeping progress.
+
+**Signing:** builds use `android/app/sideload.keystore` (committed on purpose so every build shares one signature
+and updates in place). It is fine for sharing APKs, but before publishing on Google Play create a private key and
+set `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`.
+
+**Building locally** (JDK 21 and the Android SDK):
+
+```bash
+npm ci
+npm run android:sync
+cd android && ./gradlew assembleRelease   # -> android/app/build/outputs/apk/release/app-release.apk
+```
+
 ## Loadouts
 
 Players pick 2 guns plus a lethal and a tactical in **Loadout** (main menu or pause menu). Gear unlocks by level:
@@ -92,5 +117,5 @@ Settings → HUD: overall size, button opacity, crosshair style and colour, togg
 - `fx.js`, `audio.js`: effects and synthesized sound
 - `data.js`: profiles, XP, levels, guns, equipment and loadouts (saved in the browser's localStorage)
 - `three.module.min.js`: bundled three.js
-- `ios/`, `capacitor.config.json`, `scripts/`: the iOS app (see above)
+- `ios/`, `android/`, `capacitor.config.json`, `scripts/`: the iOS and Android apps (see above)
 - `docs/sketches/`: the original concept sketch and test screenshots
