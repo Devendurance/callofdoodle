@@ -181,7 +181,7 @@ function spawnPlayer(spot) {
   p.hp = 100; p.armor = 50; p.alive = true; p.streak = 0; p.protectUntil = G.time + 2;
   applyLoadout(p);
   p.blindT = 0; p.slowT = 0; $('#flashOverlay').style.opacity = 0; $('#shockOverlay').style.opacity = 0;
-  p.reloading = 0; p.swapT = 0; p.ads = false; p.crouch = false; p.vel.x = p.vel.z = 0;
+  p.reloading = 0; p.swapT = 0; p.ads = false; adsCancelHold(); p.crouch = false; p.vel.x = p.vel.z = 0;
   $('#bScope').classList.remove('on'); $('#bCrouch').classList.remove('on');
   updateWeaponHUD();
 }
@@ -324,6 +324,30 @@ function setADS(on) {
   if (on && (p.reloading > 0 || p.swapT > 0 || !p.alive)) return;
   p.ads = on; $('#bScope').classList.toggle('on', on);
 }
+// Aim-down-sights input modes (Settings > Aim down sights):
+//  tap    - each press toggles ADS on/off
+//  hold   - ADS only while the button is held
+//  hybrid - a quick tap toggles, a longer press works like hold
+const ADS_HOLD_MS = 220;
+const adsIn = { held: false, holdMode: false, downAt: 0 };
+function adsMode() { const m = store.settings.adsMode; return m === 'hold' || m === 'hybrid' ? m : 'tap'; }
+function adsPress() {
+  const p = G.player; if (!p?.alive) return;
+  const mode = adsMode();
+  if (mode === 'tap') { setADS(!p.ads); return; }
+  adsIn.held = true; adsIn.downAt = performance.now();
+  adsIn.holdMode = mode === 'hold';
+  if (mode === 'hybrid' && p.ads) { setADS(false); adsIn.held = false; return; } // tap again to drop a toggled scope
+  setADS(true);
+}
+function adsRelease() {
+  if (!adsIn.held) return;
+  adsIn.held = false;
+  const p = G.player; if (!p) return;
+  const long = performance.now() - adsIn.downAt >= ADS_HOLD_MS;
+  if (adsMode() === 'hold' || adsIn.holdMode || long) setADS(false); // hybrid quick tap keeps ADS on
+}
+function adsCancelHold() { adsIn.held = false; adsIn.holdMode = false; }
 const FUSE = { frag: 2.0, sticky: 1.6, fire: 3.0, cluster: 1.8, bomblet: 0.7, mine: 60, ink: 1.4, flash: 1.3, concussion: 1.4 };
 function throwNade(owner, type, origin, dir, power = 15) {
   const mesh = makeGrenadeMesh(type); scene.add(mesh);
@@ -461,7 +485,7 @@ function playerHurt(attacker, amount) {
 function playerDied(attacker, opts) {
   const p = G.player;
   p.killer = attacker && attacker !== p ? attacker : null;
-  setADS(false); p.firing = false;
+  setADS(false); adsCancelHold(); p.firing = false;
   $('#deathScreen').classList.remove('hidden');
   const wn = weaponName(opts.weapon);
   $('#killedBy').innerHTML = p.killer ? `erased by <b style="color:${p.killer.ink}">${esc(p.killer.name)}</b>${wn ? ` with the ${esc(wn)}` : ''}${opts.head ? ' (headshot)' : ''}` : 'you erased yourself!';
@@ -705,7 +729,7 @@ function btnDown(name, el) {
   if (!p.alive) return;
   switch (name) {
     case 'fire': p.firing = true; p.firedThisPress = false; break;
-    case 'scope': setADS(!p.ads); break;
+    case 'scope': adsPress(); break;
     case 'jump': input.jump = true; break;
     case 'crouch': p.crouch = !p.crouch; $('#bCrouch').classList.toggle('on', p.crouch); break;
     case 'reload': startReload(); break;
@@ -718,6 +742,7 @@ function btnDown(name, el) {
 function btnUp(name, el) {
   if (el) el.classList.remove('pressed');
   if (name === 'fire' && G.player) G.player.firing = false;
+  if (name === 'scope') adsRelease();
 }
 function hudTarget(t) { return t instanceof Element && (t === canvas || t.closest('#hud')); }
 addEventListener('touchstart', (e) => {
@@ -751,7 +776,7 @@ addEventListener('touchmove', (e) => {
   for (const t of e.changedTouches) {
     const s = touches.get(t.identifier); if (!s) continue;
     if (s.kind === 'move') updateJoy(t.clientX, t.clientY);
-    else if (s.kind === 'look' || (s.kind === 'btn' && s.btn === 'fire')) {
+    else if (s.kind === 'look' || (s.kind === 'btn' && (s.btn === 'fire' || s.btn === 'scope'))) {
       input.lookDX += t.clientX - s.x; input.lookDY += t.clientY - s.y;
     }
     s.x = t.clientX; s.y = t.clientY;
@@ -775,7 +800,7 @@ function updateJoy(x, y) {
 }
 function releaseAllTouches() {
   for (const [, s] of touches) if (s.kind === 'btn') btnUp(s.btn, s.el);
-  touches.clear(); input.jx = input.jy = 0; setKnob(0, 0);
+  touches.clear(); input.jx = input.jy = 0; setKnob(0, 0); adsCancelHold();
 }
 
 // mouse / keyboard
@@ -793,9 +818,9 @@ canvas.addEventListener('mousedown', (e) => {
   if (document.pointerLockElement !== canvas) { lockPointer(); return; }
   const p = G.player; if (!p?.alive) return;
   if (e.button === 0) { p.firing = true; p.firedThisPress = false; }
-  if (e.button === 2) setADS(!p.ads);
+  if (e.button === 2) adsPress();
 });
-addEventListener('mouseup', (e) => { if (e.button === 0 && G.player) G.player.firing = false; });
+addEventListener('mouseup', (e) => { if (e.button === 0 && G.player) G.player.firing = false; if (e.button === 2) adsRelease(); });
 addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('mousemove', (e) => {
   if (document.pointerLockElement === canvas && S.mode === 'playing' && !S.paused) { input.lookDX += e.movementX * 0.55; input.lookDY += e.movementY * 0.55; }
@@ -823,7 +848,7 @@ addEventListener('keydown', (e) => {
   }
 });
 addEventListener('keyup', (e) => { input.keys[e.code] = false; if (e.code === 'Tab') toggleBoard(false); });
-addEventListener('blur', () => { input.keys = {}; if (G.player) G.player.firing = false; });
+addEventListener('blur', () => { input.keys = {}; adsCancelHold(); if (G.player) G.player.firing = false; });
 document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'playing' && !S.paused) pauseGame(); });
 
 function pauseGame() {
@@ -927,6 +952,9 @@ function updatePlayer(dt) {
     p.yaw += clamp(angDiff(p.yaw, t.yaw), -dt * 0.9, dt * 0.9);
     p.pitch += clamp(t.pitch - p.pitch, -dt * 0.5, dt * 0.5);
   }
+  // hold / hybrid-hold: keep (re)entering ADS while the button stays down, e.g. after a reload, swap or sniper bolt
+  if (adsIn.held && adsMode() === 'hybrid' && performance.now() - adsIn.downAt >= ADS_HOLD_MS) adsIn.holdMode = true;
+  if (adsIn.held && adsIn.holdMode && !p.ads && p.alive && p.reloading <= 0 && p.swapT <= 0 && !(W().cls === 'sniper' && p.cool > 0)) setADS(true);
   p.adsK += ((p.ads ? 1 : 0) - p.adsK) * Math.min(1, dt * 14 * W().adsSpd);
 
   // pickups
@@ -1256,7 +1284,7 @@ function renderSettings() {
     };
   };
   bind('#setSens', 'sens', '#setSensV', v => (+v).toFixed(2));
-  bind('#setAssist', 'assist'); bind('#setSfx', 'sfx'); bind('#setVib', 'vib');
+  bind('#setAds', 'adsMode'); bind('#setAssist', 'assist'); bind('#setSfx', 'sfx'); bind('#setVib', 'vib');
   bind('#setBots', 'bots', '#setBotsV'); bind('#setDiff', 'diff'); bind('#setQuality', 'quality');
   bind('#setFull', 'full'); bind('#setFps', 'fps');
   bind('#setHudScale', 'hudScale', '#setHudScaleV', v => `${Math.round(v * 100)}%`);
